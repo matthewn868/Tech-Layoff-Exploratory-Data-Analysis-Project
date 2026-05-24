@@ -6,19 +6,18 @@ A complete data analytics project covering the full workflow from raw data to bu
 
 ## Project Structure
 
-├── README.md                        
-├── 1_data_cleaning.sql              
-└── 2_exploratory_analysis.sql       
+- `1_data_cleaning.sql` — Step 1: Clean and prepare the raw data
+- `2_exploratory_analysis.sql` — Step 2: Analyze the cleaned data
 
-Run 1_data_cleaning.sql first. It produces layoffs_staging2, which is the input for 2_exploratory_analysis.sql.
+Run `1_data_cleaning.sql` first. It produces `layoffs_staging2`, which is the input for `2_exploratory_analysis.sql`.
 
 ---
 
 ## Dataset
 
-- Source: layoffs.fyi — tracking global tech layoffs since COVID-19
-- Coverage: 2020–2023
-- Fields: Company, location, industry, total laid off, percentage laid off, date, funding stage, country, funds raised
+- **Source:** layoffs.fyi — tracking global tech layoffs since COVID-19
+- **Coverage:** 2020–2023
+- **Fields:** Company, location, industry, total laid off, percentage laid off, date, funding stage, country, funds raised
 
 ---
 
@@ -53,7 +52,7 @@ Starting from raw, unprocessed layoffs data, this script builds a professional m
 
 ## Script 2 — Exploratory Data Analysis
 
-Using the cleaned layoffs_staging2 table as input, this script surfaces meaningful trends and patterns across companies, industries, countries, and time periods.
+Using the cleaned `layoffs_staging2` table as input, this script surfaces meaningful trends and patterns across companies, industries, countries, and time periods.
 
 **Questions Explored**
 - Which companies laid off the most employees in total?
@@ -88,5 +87,5 @@ Using the cleaned layoffs_staging2 table as input, this script surfaces meaningf
 
 ## How to Run
 1. Open MySQL Workbench and connect to your local server
-2. Run 1_data_cleaning.sql — this creates and populates layoffs_staging2
-3. Run 2_exploratory_analysis.sql — this queries layoffs_staging2 for insights
+2. Run `1_data_cleaning.sql` — this creates and populates `layoffs_staging2`
+3. Run `2_exploratory_analysis.sql` — this queries `layoffs_staging2` for insights
