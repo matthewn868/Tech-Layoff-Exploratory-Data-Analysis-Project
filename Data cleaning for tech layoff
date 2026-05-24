@@ -1,0 +1,151 @@
+-- ================================================
+-- TECH LAYOFFS DATA CLEANING
+-- Source: layoffs.fyi (2020-2023)
+-- Output: layoffs_staging2 (used in exploratory analysis)
+-- ================================================
+
+-- Preview raw data
+SELECT * FROM layoffs;
+
+-- Create staging table to preserve raw data
+CREATE TABLE layoffs_staging LIKE layoffs;
+
+-- FIX 1: Added missing INTO keyword (was: INSERT layoffs_staging)
+INSERT INTO layoffs_staging
+SELECT * FROM layoffs;
+
+-- Verify staging table
+SELECT * FROM layoffs_staging;
+
+-- Identify duplicates using ROW_NUMBER window function
+SELECT *,
+ROW_NUMBER() OVER(
+    PARTITION BY company, location, industry, total_laid_off, percentage_laid_off, `date`, 
+    stage, country, funds_raised_millions
+) AS row_num
+FROM layoffs_staging;
+
+-- Preview duplicates via CTE
+WITH duplicate_cte AS (
+    SELECT *,
+    ROW_NUMBER() OVER(
+        PARTITION BY company, location, industry, total_laid_off, percentage_laid_off, `date`, 
+        stage, country, funds_raised_millions
+    ) AS row_num
+    FROM layoffs_staging
+)
+SELECT * FROM duplicate_cte WHERE row_num > 1;
+
+-- Spot check a specific company for duplicates
+SELECT * FROM layoffs_staging WHERE company = '&Open';
+
+-- NOTE: MySQL does not allow DELETE directly from a CTE
+-- The CTE delete block has been removed and replaced with
+-- the safer staging2 approach below
+
+-- Create secondary staging table with row_num column for safe duplicate removal
+-- FIX 2: percentage_laid_off changed from VARCHAR to TEXT to match
+--         how the exploratory script treats it (NULL checks, AVG, comparisons)
+CREATE TABLE `layoffs_staging2` (
+  `company` varchar(512) DEFAULT NULL,
+  `location` varchar(512) DEFAULT NULL,
+  `industry` varchar(512) DEFAULT NULL,
+  `total_laid_off` int DEFAULT NULL,
+  `percentage_laid_off` text DEFAULT NULL,
+  `date` varchar(512) DEFAULT NULL,
+  `stage` varchar(512) DEFAULT NULL,
+  `country` varchar(512) DEFAULT NULL,
+  `funds_raised_millions` int DEFAULT NULL,
+  `row_num` INT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- Insert data with row numbers assigned
+INSERT INTO layoffs_staging2
+SELECT *,
+ROW_NUMBER() OVER(
+    PARTITION BY company, location, industry, total_laid_off, percentage_laid_off, `date`, 
+    stage, country, funds_raised_millions
+) AS row_num
+FROM layoffs_staging;
+
+-- Verify before deleting
+SELECT * FROM layoffs_staging2 WHERE row_num > 1;
+
+-- Delete duplicates safely
+DELETE FROM layoffs_staging2 WHERE row_num > 1;
+
+-- Verify clean data
+SELECT * FROM layoffs_staging2;
+
+-- ================================================
+-- STANDARDIZATION
+-- ================================================
+
+-- Trim whitespace from company names
+UPDATE layoffs_staging2 SET company = TRIM(company);
+
+-- Verify trim results
+SELECT company, TRIM(company) FROM layoffs_staging2;
+
+-- Preview crypto industry variants
+SELECT * FROM layoffs_staging2 WHERE industry LIKE 'Crypto%';
+
+-- Standardize all Crypto variants to single value
+UPDATE layoffs_staging2
+SET industry = 'Crypto'
+WHERE industry LIKE 'Crypto%';
+
+-- Preview country inconsistencies
+SELECT DISTINCT country FROM layoffs_staging2 ORDER BY 1;
+SELECT DISTINCT country, TRIM(TRAILING '.' FROM country) FROM layoffs_staging2 ORDER BY 1;
+
+-- Fix trailing period in United States entries
+UPDATE layoffs_staging2
+SET country = TRIM(TRAILING '.' FROM country)
+WHERE country LIKE 'United States%';
+
+-- Preview date column before conversion
+SELECT `date` FROM layoffs_staging2;
+
+-- Convert date from VARCHAR string to proper DATE type
+-- FIX 3: This is critical — the exploratory script uses YEAR(`date`),
+--         SUBSTRING(`date`,1,7), MIN/MAX(`date`) which all require DATE type
+UPDATE layoffs_staging2
+SET `date` = STR_TO_DATE(`date`, '%m/%d/%Y');
+
+ALTER TABLE layoffs_staging2
+MODIFY COLUMN `date` DATE;
+
+-- ================================================
+-- NULL HANDLING
+-- ================================================
+
+-- Find records with both layoff fields NULL (unusable records)
+SELECT * FROM layoffs_staging2
+WHERE total_laid_off IS NULL
+AND percentage_laid_off IS NULL;
+
+-- Investigate NULL and blank industry values
+SELECT * FROM layoffs_staging2
+WHERE industry IS NULL OR industry = '';
+
+-- Final check before deletion
+SELECT * FROM layoffs_staging2
+WHERE total_laid_off IS NULL
+AND percentage_laid_off IS NULL;
+
+-- Remove records with no layoff data — not useful for analysis
+DELETE FROM layoffs_staging2
+WHERE total_laid_off IS NULL
+AND percentage_laid_off IS NULL;
+
+-- Verify final clean dataset
+SELECT * FROM layoffs_staging2;
+
+-- Drop helper column — no longer needed
+ALTER TABLE layoffs_staging2 DROP COLUMN row_num;
+
+-- ================================================
+-- layoffs_staging2 is now ready for exploratory analysis
+-- See: 2_exploratory_analysis.sql
+-- ================================================
